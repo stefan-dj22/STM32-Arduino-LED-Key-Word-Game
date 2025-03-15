@@ -37,7 +37,6 @@ extern "C" {
 #define TM_HFIN_DELAY   1    /**<  uS Delay used by shiftIn function for High-freq MCU  */
 #define TM_HFOUT_DELAY  1 /**<  uS Delay used by shiftOut function for High-freq MCU */  
 
-
 /*! Alignment of text on display */
 typedef enum : uint8_t
 {

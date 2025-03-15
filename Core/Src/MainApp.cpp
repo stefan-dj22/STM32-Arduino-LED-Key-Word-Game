@@ -54,7 +54,9 @@ void MainApp()
 	tm.displayBegin();
 	//HAL_Delay(500);
 
-	tm_plus.displayText("");
+	tm_plus.displaySlidingText("Hello world");
+	tm_plus.displayText("Hello", TMAlignTextLeft);
+	tm_plus.displayText("World", TMAlignTextRight);
 	uint8_t buttons;
 	int16_t buttons_led;
 	while(1)
