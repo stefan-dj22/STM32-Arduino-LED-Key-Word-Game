@@ -8,6 +8,8 @@
 #define TM1638PLUS_H
 
 #include "TM1638plus_common.h"
+#include "timer_utils.h"
+#include <stdint.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -32,14 +34,20 @@ public:
 
 	void displayText(const char *text, AlignTextType_e textAlign);
 	void displayASCII(uint8_t position, uint8_t ascii);
-	void displayASCIIwDot(uint8_t position, uint8_t ascii) ;
+	void displayASCIIwDot(uint8_t position, uint8_t ascii);
 	void displayHex(uint8_t position, uint8_t hex);
 	void display7Seg(uint8_t position, uint8_t value);
 	void displayIntNum(unsigned long number, bool leadingZeros = true, AlignTextType_e = TMAlignTextLeft);
 	void DisplayDecNumNibble(uint16_t numberUpper, uint16_t numberLower, bool leadingZeros = true, AlignTextType_e = TMAlignTextLeft);
 	void displaySlidingText(const char *text);
-private:
+	uint8_t updateSlidingText(void);
 
+private:
+	SoftTimer_t _slideTimer;
+	const char* _currentText;
+	uint8_t _textSize;
+	uint8_t _currentPosition;
+	uint8_t _isSliding;
 };
 
 #endif

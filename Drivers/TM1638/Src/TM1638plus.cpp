@@ -169,22 +169,57 @@ void TM1638plus::displayText(const char *text, AlignTextType_e textAlignment) {
  *       Consider replacing it with an asynchronous delay mechanism if needed.
  */
 void TM1638plus::displaySlidingText(const char *textPointer) {
-	uint8_t textSize = strlen(textPointer);
-	uint8_t chToShowCnt;
-	const char* textStartPostion;
+	_currentText = textPointer;
+	_textSize = strlen(textPointer);
+	_currentPosition = 0;
+	_isSliding = 1;
+	
+	// Initialize first display
+	uint8_t chToShowCnt = 1;
 	char textToShow[TM_DISPLAY_SIZE+1];
+	memset(textToShow, '\0', sizeof(textToShow));
+	strncpy(textToShow, textPointer, chToShowCnt);
+	displayText(textToShow, TMAlignTextRight);
+	
+	// Start the timer for next update
+	SoftTimer_Start(&_slideTimer, 500);
+}
 
-	for(int currsor = 0; currsor < textSize; currsor++)
-	{
-		memset(textToShow, '\0', sizeof(textToShow));
-		chToShowCnt = (currsor < TM_DISPLAY_SIZE-1) ? (currsor+1) : TM_DISPLAY_SIZE;
-		textStartPostion = textPointer + (currsor - (chToShowCnt - 1));
-
-		strncpy(textToShow, textStartPostion, chToShowCnt);
-
-		displayText(textToShow, TMAlignTextRight);
-		HAL_Delay(500); //TODO: should be replaced with asynch delay
+/**
+ * @brief Updates the sliding text animation in a non-blocking way
+ * 
+ * This function should be called periodically in the main loop to update the
+ * sliding text animation. It uses a software timer to determine when to move
+ * to the next position in the animation sequence.
+ * 
+ * @return 1 if the animation is still in progress, 0 if it has completed
+ */
+uint8_t TM1638plus::updateSlidingText(void) {
+	if (!_isSliding || !SoftTimer_IsExpired(&_slideTimer)) {
+		return _isSliding;
 	}
+	
+	_currentPosition++;
+	
+	if (_currentPosition >= _textSize) {
+		_isSliding = 0;
+		return 0;
+	}
+	
+	uint8_t chToShowCnt = (_currentPosition < TM_DISPLAY_SIZE-1) ? 
+						  (_currentPosition+1) : TM_DISPLAY_SIZE;
+	
+	char textToShow[TM_DISPLAY_SIZE+1];
+	memset(textToShow, '\0', sizeof(textToShow));
+	const char* textStartPosition = _currentText + (_currentPosition - (chToShowCnt - 1));
+	
+	strncpy(textToShow, textStartPosition, chToShowCnt);
+	displayText(textToShow, TMAlignTextRight);
+	
+	// Restart timer for next update
+	SoftTimer_Start(&_slideTimer, 500);
+	
+	return 1;
 }
 
 /*!

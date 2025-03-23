@@ -9,6 +9,7 @@
 #include "TM1638plus.h"
 #include "pin-info.h"
 #include "stdio.h"
+#include "timer_utils.h"
 
 void Test0(TM1638plus tm)
 {
@@ -16,7 +17,7 @@ void Test0(TM1638plus tm)
   HAL_Delay(500);
   tm.reset();
 }
-
+#define show_str "Hello world"
 void Test13(TM1638plus tm)
 {
   //Test 13 LED display
@@ -43,8 +44,12 @@ void Test13(TM1638plus tm)
 
 }
 
+
 void MainApp()
 {
+	// Initialize timer utilities
+	TimerUtils_Init();
+
 	TM_GPIO_PinConfig_t STB_gpio = {.port= STB_GPIO_Port, .pin= STB_Pin};
 	TM_GPIO_PinConfig_t CLK_gpio = {.port= CLK_GPIO_Port, .pin= CLK_Pin};
 	TM_GPIO_PinConfig_t DIO_gpio = {.port= DIO_GPIO_Port, .pin= DIO_Pin};
@@ -52,18 +57,19 @@ void MainApp()
 	TM1638plus tm_plus(STB_gpio, CLK_gpio, DIO_gpio);
 
 	tm.displayBegin();
-	//HAL_Delay(500);
 
-	tm_plus.displaySlidingText("Hello world");
-	tm_plus.displayText("Hello", TMAlignTextLeft);
-	tm_plus.displayText("World", TMAlignTextRight);
+	tm_plus.displaySlidingText(show_str);
 	uint8_t buttons;
 	int16_t buttons_led;
+	
 	while(1)
 	{
+		// Update sliding text (returns 0 when complete)
+		tm_plus.updateSlidingText();
+		
+		// Read buttons and update LEDs
 		buttons = tm_plus.readButtons();
 		buttons_led = buttons << 8;
 		tm_plus.setLEDs(buttons_led);
 	}
-
 }
