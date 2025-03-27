@@ -27,14 +27,18 @@ uint8_t New_Action_Check(Command_t* cmd, uint8_t debaunced_buttons)
     }
     //Button 0 - left end position
     //Button 7 - right end position
-    //if new press is more left than the last pressed button (on higher bit position)
-    if(cmd->button_clicked > 0 && debaunced_buttons > 0 && debaunced_buttons > cmd->button_clicked)
+    //if new press is more right than the last pressed button (on higher bit position), return 0
+    if(cmd->button_clicked > 0 && debaunced_buttons > 0)
     {
-        return 0;
+        uint8_t lb_btn_clk = cmd->button_clicked & (-cmd->button_clicked); //lowest bit set in button_clicked
+        if(debaunced_buttons > lb_btn_clk) //new press is more right than the last clicked button
+        {
+            return 0;
+        }
     }
     //If pressed button is one of the already clicked buttons and not multi click button and there is just one button clicked
-    if((cmd->button_clicked & debaunced_buttons) && !(debaunced_buttons & MULTI_CLICK_BUTTONS) 
-        && !(cmd->button_clicked & (cmd->button_clicked-1)))
+    if((cmd->button_clicked & debaunced_buttons) && (!(debaunced_buttons & MULTI_CLICK_BUTTONS)
+        || (cmd->button_clicked & (cmd->button_clicked-1))))
     {
         return 0;
     }
