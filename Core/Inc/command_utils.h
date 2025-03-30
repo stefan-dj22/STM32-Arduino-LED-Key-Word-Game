@@ -17,7 +17,8 @@ typedef enum {
     CMD_PREV,          // 3 x SP(button1) - Previous item
     CMD_VIEW,          // n x SP(different button) - View current item
     CMD_SET,           // n x SP(different button) + LP(new button) - Set value
-    CMD_INVALID        // Invalid command sequence
+    CMD_INVALID,        // Invalid command sequence
+    CMD_CNT
 } CommandType_t;
 
 /**

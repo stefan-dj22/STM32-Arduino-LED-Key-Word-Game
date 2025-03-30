@@ -8,6 +8,17 @@
 #define MULTI_CLICK_BUTTONS (1 << NEXT_BUTTON | 1 << PREV_BUTTON)  // Buttons that can be used for multi-click
 #define NEXT_PREV_COUNT 3        // Number of presses needed for NEXT/PREV
 
+/**
+ * @brief Initializes a Command structure with default values
+ * @param cmd Pointer to Command_t structure to initialize
+ * 
+ * Sets all command tracking variables to their initial states:
+ * - No buttons pressed or clicked
+ * - No click count
+ * - No sequence completion
+ * - No timestamp
+ * - No active command
+ */
 void Command_Init(Command_t* cmd) {
     cmd->button_pressed = 0;
     cmd->button_clicked = 0;
@@ -18,12 +29,24 @@ void Command_Init(Command_t* cmd) {
     DBG_DEBUG(DBG_CAT_COMMAND, "Command initialized");
 }
 
-uint8_t New_Action_Check(Command_t* cmd, uint8_t debaunced_buttons)
+/**
+ * @brief Validates if a new button action is valid within the current command sequence
+ * @param cmd Pointer to current Command_t structure
+ * @param debaunced_buttons Current state of debounced buttons (bitmap)
+ * @return 1 if action is valid, 0 if invalid
+ * 
+ * Validates button press sequences according to rules:
+ * - Only one button can be pressed at a time
+ * - New presses must be to the left of previous presses
+ * - Cannot press already clicked buttons (except multi-click buttons)
+ * - Must be consistent with last pressed button
+ */
+bool New_Action_Check(Command_t* cmd, uint8_t debaunced_buttons)
 { 
     //if more than one button is pressed
     if(debaunced_buttons & (debaunced_buttons - 1))
     {
-        return 0;
+        return false;
     }
     //Button 0 - left end position
     //Button 7 - right end position
@@ -33,24 +56,36 @@ uint8_t New_Action_Check(Command_t* cmd, uint8_t debaunced_buttons)
         uint8_t lb_btn_clk = cmd->button_clicked & (-cmd->button_clicked); //lowest bit set in button_clicked
         if(debaunced_buttons > lb_btn_clk) //new press is more right than the last clicked button
         {
-            return 0;
+            return false;
         }
     }
     //If pressed button is one of the already clicked buttons and not multi click button and there is just one button clicked
     if((cmd->button_clicked & debaunced_buttons) && (!(debaunced_buttons & MULTI_CLICK_BUTTONS)
         || (cmd->button_clicked & (cmd->button_clicked-1))))
     {
-        return 0;
+        return false;
     }
     //if new press is not the same as the last pressed button
     if(cmd->button_pressed != 0 && debaunced_buttons != 0 && cmd->button_pressed != debaunced_buttons)
     {
-        return 0;
+        return false;
     }
 
-    return 1;
+    return true;
 }
 
+/**
+ * @brief Processes a new button press event
+ * @param cmd Pointer to current Command_t structure
+ * @param debaunced_buttons Current state of debounced buttons (bitmap)
+ * @param current_time Current system timestamp
+ * 
+ * Handles new button press events:
+ * - Updates press timestamp
+ * - Records pressed button
+ * - Processes multi-click sequences for NEXT/PREV commands
+ * - Tracks click counts
+ */
 void New_Press_Process(Command_t* cmd, uint8_t debaunced_buttons, uint32_t current_time)
 {
     //update new press parameters
@@ -75,6 +110,17 @@ void New_Press_Process(Command_t* cmd, uint8_t debaunced_buttons, uint32_t curre
     }
 }
 
+/**
+ * @brief Processes ongoing button press states
+ * @param cmd Pointer to current Command_t structure
+ * @param debaunced_buttons Current state of debounced buttons (bitmap)
+ * @param long_press_detected Flag indicating if a long press was detected
+ * @param current_time Current system timestamp
+ * 
+ * Handles both new and existing button press states:
+ * - For new presses, delegates to New_Press_Process
+ * - For existing presses, checks for long press to trigger SET command
+ */
 void Press_Process(Command_t* cmd, uint8_t debaunced_buttons, bool long_press_detected, uint32_t current_time)
 {
     //process press btn
@@ -93,10 +139,27 @@ void Press_Process(Command_t* cmd, uint8_t debaunced_buttons, bool long_press_de
     }
 }
 
+/**
+ * @brief Main command processing function that handles button input state machine
+ * @param cmd Pointer to current Command_t structure
+ * @param debaunced_buttons Current state of debounced buttons (bitmap)
+ * @param long_press_detected Flag indicating if a long press was detected
+ * 
+ * Main state machine that:
+ * - Tracks command sequences
+ * - Validates button actions
+ * - Processes press events
+ * - Handles timeouts
+ * - Sets appropriate commands (VIEW, SET, NEXT, PREV, INVALID)
+ */
 void Command_Process(Command_t* cmd, uint8_t debaunced_buttons, bool long_press_detected)
 {
     uint32_t current_time = TimerUtils_GetTick();
 
+    if(cmd->sequence_complete )
+    {
+        return;
+    }
     //If no press has been detected, set none command
     if(cmd->last_press_time == 0)
     {
@@ -115,7 +178,7 @@ void Command_Process(Command_t* cmd, uint8_t debaunced_buttons, bool long_press_
     {
         Press_Process(cmd, debaunced_buttons, long_press_detected, current_time);
     }
-    else if(!cmd->sequence_complete)
+    else
     {
         cmd->button_clicked |= cmd->button_pressed;
         cmd->button_pressed = debaunced_buttons;
@@ -134,10 +197,20 @@ void Command_Process(Command_t* cmd, uint8_t debaunced_buttons, bool long_press_
     }
 }
 
+/**
+ * @brief Gets the current command type
+ * @param cmd Pointer to current Command_t structure
+ * @return Current CommandType_t value
+ */
 CommandType_t Command_GetType(Command_t* cmd) {
     return cmd->current_cmd;
 }
 
+/**
+ * @brief Checks if current command sequence is complete
+ * @param cmd Pointer to current Command_t structure
+ * @return true if sequence is complete, false otherwise
+ */
 bool Command_IsSequenceComplete(Command_t* cmd) {
     return cmd->sequence_complete;
 }   

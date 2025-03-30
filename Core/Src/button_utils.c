@@ -25,6 +25,7 @@ void Button_Process(Button_t* button, uint8_t raw_state) {
                 DBG_DEBUG(DBG_CAT_BUTTON, "Button press detected, entering debounce");
             }
             button->is_clicked = false;
+            button->is_long_press = false;
             break;
 
         case BUTTON_STATE_DEBOUNCING:
