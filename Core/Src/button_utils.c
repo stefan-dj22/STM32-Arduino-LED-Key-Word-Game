@@ -47,7 +47,7 @@ void Button_Process(Button_t* button, uint8_t raw_state) {
                 DBG_DEBUG(DBG_CAT_BUTTON, "Button released");
             } else if (!button->is_long_press && 
                       current_time - button->press_start >= LONG_PRESS_TIME_MS) {
-                button->is_long_press = true;
+
                 DBG_INFO(DBG_CAT_BUTTON, "Long press detected");
             }
             break;

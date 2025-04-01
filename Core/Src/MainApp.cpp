@@ -17,6 +17,7 @@
 #include "stm32f1xx_hal.h"
 #include "stm32f1xx.h"
 #include "main.h"
+#include "LEDControlUnit.h"
 
 // Array of buttons for debouncing
 #define NUM_BUTTONS 8
@@ -92,9 +93,9 @@ static bool app_init_tm1638(TM1638plus*& tm, TM1638plus_common*& tm_common) {
 }
 
 static void app_init_interaction(Button_t* buttons, Command_t* command) {
-    for(int i = 0; i < NUM_BUTTONS; i++) {
-        Button_Init(&buttons[i]);
-    }
+	for(int i = 0; i < NUM_BUTTONS; i++) {
+	    Button_Init(&buttons[i]);
+	}
     Command_Init(command);
 }
 
@@ -103,10 +104,10 @@ static void app_process_buttons(uint8_t* out_pressed_buttons, bool* out_long_pre
     uint8_t raw_buttons = tm->readButtons();
     *out_long_press_detected = false;
 
-    // Update each button's debounced state and check for commands
-    for(int i = 0; i < NUM_BUTTONS; i++) {
-        Button_Process(&buttons[i], getButtonState(raw_buttons, i));
-
+		// Update each button's debounced state and check for commands
+		for(int i = 0; i < NUM_BUTTONS; i++) {
+		    Button_Process(&buttons[i], getButtonState(raw_buttons, i));
+		    
         // Update debounced button states
         if(Button_IsPressed(&buttons[i])) {
             *out_pressed_buttons |= (1 << i);
@@ -154,7 +155,9 @@ static void app_init_state_transition_table() {
 }
 #define TIMEOUT_ERROR 2000u
 #define TIMEOUT_NONE 0
-uint8_t command_timeout = TIMEOUT_NONE;
+#define TIMEOUT_READING 1000u
+
+uint32_t command_timeout = TIMEOUT_NONE;
 uint32_t command_start_time = 0;
 static void app_update_state(AppState_t* currentState, AppState_t* defaultState, Command_t* command) {
 	*defaultState = (*currentState != STATE_SET_DISPLAY_SET) ? (*currentState) : (STATE_SET_DISPLAY_VIEW);
@@ -179,29 +182,21 @@ void turnLeds(TM1638plus* tm, bool on, uint16_t led_mask){
     }
 }
 
-bool leds_on = false;
+
 #define ALL_LEDS_MASK 0xff00
-static void app_update_leds(Command_t* command, AppState_t* currentState, TM1638plus* tm) {
-    if(*currentState == STATE_ERROR)
-    {
-        if(leds_interval_start_time - TimerUtils_GetTick() > leds_interval_time || leds_interval_start_time == 0)
-        {
-            leds_interval_start_time = TimerUtils_GetTick();
-            turnLeds(tm, leds_on, ALL_LEDS_MASK);
-            leds_on = !leds_on;
-        }
-    }//ekse if(currnetstate == STATE_SET_DISPLAY_SET) { set leds similar to error state }
-    else if (Command_IsSequenceComplete(command) && command->current_cmd == CMD_NONE)
-    {
-        turnLeds(tm, false, ALL_LEDS_MASK);
-        leds_on = false;
-        leds_interval_start_time = 0;
+static void app_update_leds(Command_t* command, AppState_t* currentState, uint8_t pressed_buttons, TM1638plus* tm, LEDControlUnit* lcu) {
+    if (Command_IsSequenceComplete(command) && command->current_cmd == CMD_NONE) //when last command is completed turn off all leds
+    {                                                  
+        lcu->setBlinkingOff();
+        lcu->setLedsOn(false);                       //and command restarts - one time event
     }
+    else if(!Command_IsSequenceComplete(command)) //when last command is completed turn off all leds    
+    {
+    }
+}
 
 
-}   
-uint16_t leds_to_turn_on = 0;
-void app_proccess_command_state(Command_t* command, AppState_t* currentState, AppState_t* defaultState)
+void app_proccess_command_state(Command_t* command, AppState_t* currentState, AppState_t* defaultState, LEDControlUnit* lcu)
 {
     switch(*currentState)
     {
@@ -209,9 +204,12 @@ void app_proccess_command_state(Command_t* command, AppState_t* currentState, Ap
         {
             if(input_enabled)
             {
-            input_enabled = false;
-            command_timeout = TIMEOUT_ERROR;
-            command_start_time = TimerUtils_GetTick();
+                input_enabled = false;
+                command_timeout = TIMEOUT_ERROR;
+                command_start_time = TimerUtils_GetTick();
+
+                lcu->setActiveLeds(0xff);
+                lcu->setBlinking(true, TimerUtils_GetTick(), LCU_ERROR_BLINK_INTERVAL);
             }
             else if(TimerUtils_GetTick() - command_start_time > command_timeout)
             {
@@ -219,20 +217,45 @@ void app_proccess_command_state(Command_t* command, AppState_t* currentState, Ap
                 command_timeout = TIMEOUT_NONE;
                 Command_Init(command);
                 command_start_time = TimerUtils_GetTick();
-                leds_to_turn_on=0;
                 *currentState = *defaultState;
+                lcu->setBlinkingOff();
+                lcu->setLedsOn(false);
+                lcu->setActiveLeds(0x00);
             }
-            break;
+		            break;
         }
+        case STATE_READING:
+        {
+        	if(command->current_cmd == CMD_VIEW)
+        	{
+				if(input_enabled)
+				{
+					input_enabled = false;
+					command_timeout = TIMEOUT_READING;
+					command_start_time = TimerUtils_GetTick();
+				}
+				else if(TimerUtils_GetTick() - command_start_time > command_timeout)
+				{
+					input_enabled = true;
+					command_timeout = TIMEOUT_NONE;
+					Command_Init(command);
+					command_start_time = TimerUtils_GetTick();
+
+                    lcu->setLedsOn(false);
+					lcu->setActiveLeds(0x00);
+				}
+        	}
+        }
+        break;
         default:
         {
-            if(Command_IsSequenceComplete(command) && ((TimerUtils_GetTick() - command_start_time) >= command_timeout))
-            {
-                command_timeout = TIMEOUT_NONE;
-                Command_Init(command);
-                command_start_time = TimerUtils_GetTick();
-                leds_to_turn_on=0;
-            }
+        	if(Command_IsSequenceComplete(command) && ((TimerUtils_GetTick() - command_start_time) >= command_timeout))
+        	{
+        		command_timeout = TIMEOUT_NONE;
+        		Command_Init(command);
+        		command_start_time = TimerUtils_GetTick();
+        		lcu->setActiveLeds(0x00);
+        	}
         }
     }
 }
@@ -252,30 +275,31 @@ void MainApp() {
         // Handle initialization failure
         return;
     }
+    LEDControlUnit lcu(tm);
     
     app_init_interaction(buttons, &command);
     app_init_state_transition_table();
     TimerUtils_Init();
-    
-    tm->displayText(getStateDisplayText(currentState), TMAlignTextLeft);
+
     while(1) {
 
         if(input_enabled)
         {
-            app_process_buttons(&pressed_buttons, &long_press_detected, tm, buttons);
-            leds_to_turn_on |= pressed_buttons<<8;
-            tm->setLEDs(leds_to_turn_on);
-            
-            Command_Process(&command, pressed_buttons, long_press_detected);
+            app_process_buttons(&pressed_buttons, &long_press_detected, tm, buttons);            
+            Command_Process(&command, pressed_buttons, long_press_detected); //based on the button states, determain the command
+
+            lcu.setLedsOn(true);
+            lcu.addActiveLeds(pressed_buttons);
             if(Command_IsSequenceComplete(&command))
             {
-            	command_start_time = TimerUtils_GetTick();
+            	command_start_time = TimerUtils_GetTick();  //if new command is started, reset the timer
                 app_update_state(&currentState, &defaultState, &command);
             }
           
         }
-        app_proccess_command_state(&command, &currentState, &defaultState);
-        app_update_leds(&command, &currentState, tm);
+        app_proccess_command_state(&command, &currentState, &defaultState, &lcu);
+        app_update_leds(&command, &currentState, pressed_buttons, tm, &lcu);
+        lcu.updateLEDs();
         app_update_display(&command, &currentState, tm);
 
         HAL_Delay(10);
