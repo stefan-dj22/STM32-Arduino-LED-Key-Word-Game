@@ -21,7 +21,9 @@ extern "C" {
  * @brief Timing constants for LED control
  * @{
  */
-#define LCU_ERROR_BLINK_INTERVAL 300u     /**< Blink interval for error state in milliseconds */
+#define LCU_LED_NONE_MASK 0x00u
+#define LCU_LED_ALL_MASK 0xffu
+#define LCU_ERROR_BLINK_INTERVAL 200u     /**< Blink interval for error state in milliseconds */
 #define LCU_DISPLAY_SET_BLINK_INTERVAL 300u /**< Blink interval for display set state in milliseconds */
 #define LCU_NO_BLINK_INTERVAL 0u          /**< Constant for no blinking */
 #define LCU_ALL_LEDS_ON_CMD 0xFF00u       /**< Command to turn on all LEDs */
@@ -73,6 +75,7 @@ public:
      */
     void setBlinking(bool blinkingOn, uint32_t blinkStartTime, uint32_t blinkInterval);
 
+    void clear();
     /**
      * @brief Set the overall LED state
      * 

@@ -2,7 +2,7 @@
 #include "timer_utils.h"
 #include "debug_log.h"
 
-#define SEQUENCE_TIMEOUT_MS 1500  // Time window for command sequence
+#define SEQUENCE_TIMEOUT_MS 1000  // Time window for command sequence
 #define NEXT_BUTTON 7            // Button 8 (0-based index)
 #define PREV_BUTTON 0            // Button 1 (0-based index)
 #define MULTI_CLICK_BUTTONS (1 << NEXT_BUTTON | 1 << PREV_BUTTON)  // Buttons that can be used for multi-click

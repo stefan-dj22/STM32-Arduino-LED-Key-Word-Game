@@ -23,7 +23,6 @@ TM1638plus::TM1638plus(TM_GPIO_PinConfig_t strobe, TM_GPIO_PinConfig_t clock, TM
 	_CLOCK_IO = clock;
 }
 
-
 /*!
 	@brief Set ONE LED on or off  Model 1  & 3
 	@param position  0-7  == L1-L8 on PCB
@@ -175,11 +174,11 @@ void TM1638plus::displaySlidingText(const char *textPointer) {
 	_isSliding = 1;
 	
 	// Initialize first display
-	uint8_t chToShowCnt = 1;
+	uint8_t chToShowCnt = TM_DISPLAY_SIZE;
 	char textToShow[TM_DISPLAY_SIZE+1];
 	memset(textToShow, '\0', sizeof(textToShow));
 	strncpy(textToShow, textPointer, chToShowCnt);
-	displayText(textToShow, TMAlignTextRight);
+	displayText(textToShow, TMAlignTextLeft);
 	
 	// Start the timer for next update
 	SoftTimer_Start(&_slideTimer, 500);
@@ -201,20 +200,21 @@ uint8_t TM1638plus::updateSlidingText(void) {
 	
 	_currentPosition++;
 	
+	// When reaching end of text, wrap around but keep tracking
 	if (_currentPosition >= _textSize) {
-		_isSliding = 0;
-		return 0;
+		_currentPosition = 0;
 	}
-	
-	uint8_t chToShowCnt = (_currentPosition < TM_DISPLAY_SIZE-1) ? 
-						  (_currentPosition+1) : TM_DISPLAY_SIZE;
 	
 	char textToShow[TM_DISPLAY_SIZE+1];
 	memset(textToShow, '\0', sizeof(textToShow));
-	const char* textStartPosition = _currentText + (_currentPosition - (chToShowCnt - 1));
 	
-	strncpy(textToShow, textStartPosition, chToShowCnt);
-	displayText(textToShow, TMAlignTextRight);
+	// Fill the display buffer with characters, wrapping around as needed
+	for (uint8_t i = 0; i < TM_DISPLAY_SIZE; i++) {
+		int textIndex = (_currentPosition + i) % _textSize;
+		textToShow[i] = _currentText[textIndex];
+	}
+	
+	displayText(textToShow, TMAlignTextLeft);
 	
 	// Restart timer for next update
 	SoftTimer_Start(&_slideTimer, 500);
@@ -255,6 +255,13 @@ void TM1638plus::display7Seg(uint8_t position, uint8_t value) {
 	digitalWrite(_STROBE_IO, HIGH);
 }
 
+void TM1638plus::displayClear()
+{
+	for(int i=0; i < TM_DISPLAY_SIZE; i++)
+	{
+		display7Seg(i, 0x00);
+	}
+}
  /*!
 	@brief  Send Hexadecimal value to seven segment
 	@param position The position on display 0-7  
